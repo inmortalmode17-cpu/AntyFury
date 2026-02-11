@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>AntyFury - Detector de Vende Humos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+/* HEADER */
+header {
+  background: #020617;
+  padding: 25px;
+  text-align: center;
+}
+header h1 { color: #22c55e; margin: 0; }
+header p { color: #9ca3af; }
+
+/* SIDEBAR */
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 260px;
+  height: 100%;
+  background: #020617;
+  padding: 20px;
+}
+.toggle-menu {
+  width: 100%;
+  background: #111827;
+  color: #fff;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.menu-categorias { display: none; margin-top: 20px; }
+.category-card {
+  background: #111827;
+  padding: 14px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+.category-card.active { background: #1e3a8a; }
+
+/* CONTENIDO */
+.container { margin-left: 300px; padding: 40px; }
+.card {
+  background: #020617;
+  padding: 35px;
+  border-radius: 18px;
+  max-width: 650px;
+  margin: auto;
+  text-align: center;
+}
+
+input {
+  width: 100%;
+  padding: 14px;
+  border-radius: 8px;
+  border: none;
+  margin-top: 15px;
+}
+
+button {
+  margin-top: 20px;
+  padding: 14px 30px;
+  border: none;
+  border-radius: 10px;
+  background: #22c55e;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* RESULTADO */
+.resultado {
+  margin-top: 20px;
+  padding: 14px;
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+.battery {
+  margin-top: 15px;
+  height: 32px;
+  background: #1f2937;
+  border-radius: 20px;
+  overflow: hidden;
+}
+.battery-level {
+  height: 100%;
+  width: 0%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: width 0.5s ease;
+}
+
+/* COLORES */
+.risk-low { background: #22c55e; color: #000; }
+.risk-medium { background: #facc15; color: #000; }
+.risk-high { background: #ef4444; color: #fff; }
+
+#historial {
+  text-align: left;
+  margin-top: 15px;
+  font-size: 14px;
+}
+
+footer {
+  margin-top: 40px;
+  text-align: center;
+  color: #9ca3af;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>AntyFury</h1>
+  <p>Detector educativo de vende humos digitales</p>
+</header>
+
+<aside class="sidebar">
+  <button class="toggle-menu" onclick="toggleCategorias()">☰ Categorías</button>
+  <div class="menu-categorias" id="menuCategorias">
+    <div class="category-card active" onclick="setCategoria('trading', this)">📈 Trading</div>
+    <div class="category-card" onclick="setCategoria('ecommerce', this)">🛒 E-commerce</div>
+    <div class="category-card" onclick="setCategoria('reventa', this)">🔁 Reventa</div>
+    <div class="category-card" onclick="setCategoria('pasivos', this)">💰 Ingresos pasivos</div>
+  </div>
+</aside>
+
+<div class="container">
+  <div class="card">
+    <h2>Analiza promesas sospechosas</h2>
+
+    <input id="linkInput" placeholder="Ej: método secreto sin riesgo...">
+    <button onclick="analizar()">Analizar</button>
+
+    <div id="resultado" class="resultado"></div>
+
+    <div class="battery">
+      <div id="batteryLevel" class="battery-level"></div>
+    </div>
+
+    <div id="historial"></div>
+  </div>
+
+  <footer>© 2026 AntyFury — Proyecto educativo</footer>
+</div>
+
+<script>
+const API_URL = "http://localhost:3000/analyze";
+let categoriaActual = "trading";
+
+function toggleCategorias() {
+  const m = document.getElementById("menuCategorias");
+  m.style.display = m.style.display === "block" ? "none" : "block";
+}
+
+function setCategoria(cat, el) {
+  categoriaActual = cat;
+  document.querySelectorAll(".category-card").forEach(c => c.classList.remove("active"));
+  el.classList.add("active");
+}
+
+async function analizar() {
+  const texto = document.getElementById("linkInput").value;
+  const resultado = document.getElementById("resultado");
+  const nivel = document.getElementById("batteryLevel");
+
+  if (!texto) {
+    resultado.innerText = "⚠️ Ingresa un texto o enlace";
+    return;
+  }
+
+  resultado.innerText = "⏳ Analizando...";
+  nivel.style.width = "0%";
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: texto, category: categoriaActual })
+    });
+
+    const data = await res.json();
+    const riesgo = data.result.riskPercentage;
+
+    let clase = "risk-low", msg = "🟢 Riesgo bajo";
+    if (riesgo >= 30) { clase = "risk-medium"; msg = "🟡 Riesgo medio"; }
+    if (riesgo >= 60) { clase = "risk-high"; msg = "🔴 Riesgo alto"; }
+
+    resultado.className = "resultado " + clase;
+    nivel.className = "battery-level " + clase;
+    nivel.style.width = riesgo + "%";
+    nivel.innerText = riesgo + "%";
+    resultado.innerText = `${msg} — ${riesgo}%`;
+
+    guardarHistorial(riesgo);
+
+  } catch {
+    resultado.innerText = "❌ Error al conectar con el servidor";
+  }
+}
+
+function guardarHistorial(score) {
+  let h = JSON.parse(localStorage.getItem("antyfury")) || [];
+  h.unshift({ score, fecha: new Date().toLocaleString() });
+  h = h.slice(0, 5);
+  localStorage.setItem("antyfury", JSON.stringify(h));
+
+  document.getElementById("historial").innerHTML =
+    "<strong>Historial:</strong><ul>" +
+    h.map(i => `<li>${i.fecha} — ${i.score}%</li>`).join("") +
+    "</ul>";
+}
+</script>
+
+</body>
+</html>
